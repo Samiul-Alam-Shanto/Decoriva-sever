@@ -52,6 +52,7 @@ async function run() {
       const {
         search,
         category,
+        location,
         minPrice,
         maxPrice,
         page = 1,
@@ -61,6 +62,9 @@ async function run() {
 
       if (search) query.service_name = { $regex: search, $options: "i" };
       if (category && category !== "All") query.category = category;
+      if (location && location !== "All") {
+        query.location = location;
+      }
       if (minPrice || maxPrice) {
         query.cost = {};
         if (minPrice) query.cost.$gte = parseInt(minPrice);
