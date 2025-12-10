@@ -45,12 +45,84 @@ async function run() {
     await client.connect();
     const db = client.db("Decoriva_DB");
 
+    const servicesCollection = db.collection("services");
+
+    //  service related API's
+    app.get("/services", async (req, res) => {
+      const {
+        search,
+        category,
+        minPrice,
+        maxPrice,
+        page = 1,
+        limit = 6,
+      } = req.query;
+      let query = {};
+
+      if (search) query.service_name = { $regex: search, $options: "i" };
+      if (category && category !== "All") query.category = category;
+      if (minPrice || maxPrice) {
+        query.cost = {};
+        if (minPrice) query.cost.$gte = parseInt(minPrice);
+        if (maxPrice) query.cost.$lte = parseInt(maxPrice);
+      }
+
+      // Pagination Logic
+      const pageNum = parseInt(page);
+      const limitNum = parseInt(limit);
+      const skip = (pageNum - 1) * limitNum;
+
+      const total = await servicesCollection.countDocuments(query);
+      const result = await servicesCollection
+        .find(query)
+        .skip(skip)
+        .limit(limitNum)
+        .toArray();
+
+      res.send({
+        services: result,
+        totalServices: total,
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+      });
+    });
+
+    //for getting locations dynamically from backend
+    app.get("/services/locations/category", async (req, res) => {
+      try {
+        const result = await servicesCollection
+          .aggregate([
+            {
+              $match: {
+                location: { $exists: true, $ne: null, $ne: "" },
+              },
+            },
+            {
+              $group: {
+                _id: "$location",
+              },
+            },
+            {
+              $project: {
+                _id: 0,
+                location: "$_id",
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(result.map((i) => i.location));
+      } catch (error) {
+        console.error("Location Fetch Error →", error);
+        res.status(500).send({ message: "Failed to fetch locations" });
+      }
+    });
+
     await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
   } finally {
-    // Ensures that the client will close when you finish/error
     // await client.close();
   }
 }
