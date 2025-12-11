@@ -46,6 +46,29 @@ async function run() {
     const db = client.db("Decoriva_DB");
 
     const servicesCollection = db.collection("services");
+    const usersCollection = db.collection("users");
+
+    //user related api's
+
+    // Save or Update User on Login/Register
+    app.post("/auth/user", async (req, res) => {
+      const user = req.body; // { email, name, photo, role: 'user' }
+      const query = { email: user.email };
+
+      // Check if user exists
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "User already exists", insertedId: null });
+      }
+
+      // Default role is 'user' if not provided
+      const result = await usersCollection.insertOne({
+        ...user,
+        role: "user",
+        createdAt: new Date(),
+      });
+      res.send(result);
+    });
 
     //  service related API's
     app.get("/services", async (req, res) => {
