@@ -39,6 +39,22 @@ const client = new MongoClient(uri, {
   },
 });
 
+const verifyFBToken = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  try {
+    const token = authHeader.split(" ")[1];
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.decoded_email = decoded.email;
+    next();
+  } catch (error) {
+    console.error("Token Verification Error:", error.message);
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+};
+
 async function run() {
   try {
     // Connect to MongoDB
@@ -47,12 +63,13 @@ async function run() {
 
     const servicesCollection = db.collection("services");
     const usersCollection = db.collection("users");
+    const bookingsCollection = db.collection("bookings");
 
-    //user related api's
+    //!  USER related api's
 
     // Save or Update User on Login/Register
     app.post("/auth/user", async (req, res) => {
-      const user = req.body; // { email, name, photo, role: 'user' }
+      const user = req.body;
       const query = { email: user.email };
 
       // Check if user exists
@@ -70,7 +87,7 @@ async function run() {
       res.send(result);
     });
 
-    //  service related API's
+    //!  SERVICE related API's
     app.get("/services", async (req, res) => {
       const {
         search,
@@ -151,6 +168,102 @@ async function run() {
       } catch (error) {
         console.error("Location Fetch Error →", error);
         res.status(500).send({ message: "Failed to fetch locations" });
+      }
+    });
+
+    //! BOOKING API's
+
+    // Create Booking
+    app.post("/bookings", verifyFBToken, async (req, res) => {
+      const booking = req.body;
+      booking.status = "pending";
+      booking.createdAt = new Date();
+      const result = await bookingsCollection.insertOne(booking);
+      res.send(result);
+    });
+
+    //! PAYMENT API's
+
+    const VALID_COUPONS = {
+      SAVE10: 0.1,
+      STYLE20: 0.2,
+    };
+
+    app.post("/create-checkout-session", verifyFBToken, async (req, res) => {
+      try {
+        const {
+          bookingId,
+          serviceName,
+          price,
+          userEmail,
+          addons = [],
+          couponCode,
+        } = req.body;
+
+        let finalAmount = parseInt(price);
+
+        let addonsCost = 0;
+        if (addons.length > 0) {
+          addonsCost = addons.reduce((acc, item) => acc + item.price, 0);
+          finalAmount += addonsCost;
+        }
+
+        let discountAmount = 0;
+        if (couponCode && VALID_COUPONS[couponCode]) {
+          discountAmount = finalAmount * VALID_COUPONS[couponCode];
+          finalAmount -= discountAmount;
+        }
+
+        const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+
+        const session = await stripeClient.checkout.sessions.create({
+          payment_method_types: ["card"],
+
+          line_items: [
+            {
+              price_data: {
+                currency: "usd",
+                product_data: {
+                  name: `${serviceName} + Addons ${
+                    couponCode ? "(Discount Applied)" : ""
+                  }`,
+                  description: `Base: $${price}, Addons: $${addonsCost}, Discount: -$${discountAmount}`,
+                },
+                unit_amount: Math.round(finalAmount * 100),
+              },
+              quantity: 1,
+            },
+          ],
+          mode: "payment",
+          metadata: {
+            bookingId: bookingId.toString(),
+            userEmail,
+            couponUsed: couponCode || "none",
+          },
+          success_url: `${clientUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&bookingId=${bookingId}`,
+          cancel_url: `${clientUrl}/services`,
+        });
+
+        res.send({ url: session.url });
+      } catch (error) {
+        console.error("Stripe Error:", error);
+        res.status(400).send({ message: error.message });
+      }
+    });
+
+    app.post("/payments/verify", verifyFBToken, async (req, res) => {
+      const { sessionId, bookingId } = req.body;
+
+      const session = await stripeClient.checkout.sessions.retrieve(sessionId);
+      if (session.payment_status === "paid") {
+        // Update booking to paid
+        await bookingsCollection.updateOne(
+          { _id: new ObjectId(bookingId) },
+          { $set: { status: "paid", transactionId: session.payment_intent } }
+        );
+        res.send({ success: true });
+      } else {
+        res.status(400).send({ success: false });
       }
     });
 
