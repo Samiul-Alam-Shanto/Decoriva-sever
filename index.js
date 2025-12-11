@@ -91,6 +91,15 @@ async function run() {
       });
     });
 
+    // Get Single Service Details
+    app.get("/services/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await servicesCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
     //for getting locations dynamically from backend
     app.get("/services/locations/category", async (req, res) => {
       try {
