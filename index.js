@@ -87,6 +87,16 @@ async function run() {
       res.send(result);
     });
 
+    // Get User Role
+    app.get("/users/role/:email", verifyFBToken, async (req, res) => {
+      const email = req.params.email;
+      if (req.decoded_email !== email) {
+        return res.status(403).send({ message: "forbidden" });
+      }
+      const user = await usersCollection.findOne({ email });
+      res.send({ role: user?.role || "user" });
+    });
+
     //!  SERVICE related API's
     app.get("/services", async (req, res) => {
       const {
