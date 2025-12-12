@@ -181,17 +181,6 @@ async function run() {
       }
     });
 
-    //! BOOKING API's
-
-    // Create Booking
-    app.post("/bookings", verifyFBToken, async (req, res) => {
-      const booking = req.body;
-      booking.status = "pending";
-      booking.createdAt = new Date();
-      const result = await bookingsCollection.insertOne(booking);
-      res.send(result);
-    });
-
     //! PAYMENT API's
 
     const VALID_COUPONS = {
@@ -275,6 +264,38 @@ async function run() {
       } else {
         res.status(400).send({ success: false });
       }
+    });
+
+    //! BOOKING API's
+
+    // Create Booking
+    app.post("/bookings", verifyFBToken, async (req, res) => {
+      const booking = req.body;
+      booking.status = "pending";
+      booking.createdAt = new Date();
+      const result = await bookingsCollection.insertOne(booking);
+      res.send(result);
+    });
+
+    app.get("/bookings", verifyFBToken, async (req, res) => {
+      const email = req.decoded_email;
+      const user = await usersCollection.findOne({ email });
+
+      let query = {};
+
+      if (user.role === "admin") {
+        query = {};
+      } else if (user.role === "decorator") {
+        query = { decoratorEmail: email };
+      } else {
+        query = { userEmail: email };
+      }
+      // console.log(query);
+      const result = await bookingsCollection
+        .find(query)
+        .sort({ createdAt: -1 })
+        .toArray();
+      res.send(result);
     });
 
     await client.db("admin").command({ ping: 1 });
