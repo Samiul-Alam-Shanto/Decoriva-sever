@@ -298,6 +298,41 @@ async function run() {
       res.send(result);
     });
 
+    // Update Booking Status // update separate with roles
+    app.patch("/bookings/:id", verifyFBToken, async (req, res) => {
+      const id = req.params.id;
+      const updates = req.body;
+      const email = req.decoded_email;
+
+      const requester = await usersCollection.findOne({ email });
+      if (!requester)
+        return res.status(403).send({ message: "User not found" });
+
+      const filter = { _id: new ObjectId(id) };
+      let updateDoc = {};
+
+      if (requester.role === "admin") {
+        updateDoc = { ...updates };
+        delete updateDoc._id;
+      } else if (requester.role === "decorator") {
+        filter.decoratorEmail = email;
+        if (updates.status) updateDoc.status = updates.status;
+      } else {
+        return res.status(403).send({ message: "Action forbidden for users" });
+      }
+
+      const result = await bookingsCollection.updateOne(filter, {
+        $set: updateDoc,
+      });
+      if (result.matchedCount === 0) {
+        return res.status(403).send({
+          message: "Booking not found or you are not authorized to edit it.",
+        });
+      }
+
+      res.send(result);
+    });
+
     // Cancel Booking (User Only )
     app.delete("/bookings/:id", verifyFBToken, async (req, res) => {
       const id = req.params.id;
