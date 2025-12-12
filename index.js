@@ -276,7 +276,7 @@ async function run() {
       const result = await bookingsCollection.insertOne(booking);
       res.send(result);
     });
-
+    //get booking info
     app.get("/bookings", verifyFBToken, async (req, res) => {
       const email = req.decoded_email;
       const user = await usersCollection.findOne({ email });
@@ -295,6 +295,22 @@ async function run() {
         .find(query)
         .sort({ createdAt: -1 })
         .toArray();
+      res.send(result);
+    });
+
+    // Cancel Booking (User Only )
+    app.delete("/bookings/:id", verifyFBToken, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+
+      const booking = await bookingsCollection.findOne(query);
+      if (booking.status !== "pending") {
+        return res
+          .status(403)
+          .send({ message: "Cannot cancel processed booking" });
+      }
+
+      const result = await bookingsCollection.deleteOne(query);
       res.send(result);
     });
 
