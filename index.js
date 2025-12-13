@@ -64,6 +64,7 @@ async function run() {
     const servicesCollection = db.collection("services");
     const usersCollection = db.collection("users");
     const bookingsCollection = db.collection("bookings");
+    const decoratorRequestsCollection = db.collection("decoratorRequests");
 
     const verifyAdmin = async (req, res, next) => {
       const email = req.decoded_email;
@@ -77,7 +78,7 @@ async function run() {
     //!  USER related api's
 
     // Save or Update User on Login/Register
-    app.post("/auth/user", async (req, res) => {
+    app.post("/auth/user", verifyFBToken, async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
 
@@ -158,6 +159,7 @@ async function run() {
         .find(query)
         .skip(skip)
         .limit(limitNum)
+        .sort({ createdAt: -1 })
         .toArray();
 
       res.send({
@@ -206,6 +208,13 @@ async function run() {
         console.error("Location Fetch Error →", error);
         res.status(500).send({ message: "Failed to fetch locations" });
       }
+    });
+
+    //add a service
+    app.post("/services", verifyFBToken, verifyAdmin, async (req, res) => {
+      const service = req.body;
+      const result = await servicesCollection.insertOne(service);
+      res.send(result);
     });
 
     //! PAYMENT API's
