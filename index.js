@@ -65,6 +65,15 @@ async function run() {
     const usersCollection = db.collection("users");
     const bookingsCollection = db.collection("bookings");
 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded_email;
+      const query = { email };
+      const user = await usersCollection.findOne(query);
+      if (!user || user.role !== "admin") {
+        res.status(403).send({ message: "Forbidden Access" });
+      }
+      next();
+    };
     //!  USER related api's
 
     // Save or Update User on Login/Register
@@ -95,6 +104,24 @@ async function run() {
       }
       const user = await usersCollection.findOne({ email });
       res.send({ role: user?.role || "user" });
+    });
+
+    //admin stats
+    app.get("/stats", verifyFBToken, verifyAdmin, async (req, res) => {
+      const totalUsers = await usersCollection.countDocuments();
+      const totalServices = await servicesCollection.countDocuments();
+      const totalBookings = await bookingsCollection.countDocuments();
+
+      const revenueData = await bookingsCollection
+        .aggregate([
+          { $match: { status: { $ne: "pending" } } },
+          { $group: { _id: null, total: { $sum: "$price" } } },
+        ])
+        .toArray();
+
+      const revenue = revenueData.length > 0 ? revenueData[0].total : 0;
+
+      res.send({ totalUsers, totalServices, totalBookings, revenue });
     });
 
     //!  SERVICE related API's
