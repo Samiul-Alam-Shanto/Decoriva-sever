@@ -152,6 +152,18 @@ async function run() {
       }
     );
 
+    //get decorators list
+    app.get(
+      "/admin/decorators",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const query = { role: "decorator" };
+        const result = await usersCollection.find(query).toArray();
+        res.send(result);
+      }
+    );
+
     //? Decorator related API's
 
     app.post("/decorator-requests", verifyFBToken, async (req, res) => {
@@ -198,7 +210,6 @@ async function run() {
         res.send({ success: true });
       }
     );
-    n;
 
     //!  SERVICE related API's
     app.get("/services", async (req, res) => {
