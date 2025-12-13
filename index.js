@@ -125,6 +125,81 @@ async function run() {
       res.send({ totalUsers, totalServices, totalBookings, revenue });
     });
 
+    //get all users
+
+    app.get("/users", verifyFBToken, verifyAdmin, async (req, res) => {
+      const result = await usersCollection.find().toArray();
+      res.send(result);
+    });
+
+    //admin handle roles
+
+    app.patch(
+      "/users/role/:id",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const { role } = req.body;
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = {
+          $set: { role: role },
+        };
+
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
+
+    //? Decorator related API's
+
+    app.post("/decorator-requests", verifyFBToken, async (req, res) => {
+      const request = req.body;
+      const existing = await decoratorRequestsCollection.findOne({
+        email: request.email,
+      });
+      if (existing) {
+        return res.send({ message: "Request already pending or processed" });
+      }
+      const result = await decoratorRequestsCollection.insertOne(request);
+      res.send(result);
+    });
+
+    app.get(
+      "/decorator-requests",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const result = await decoratorRequestsCollection.find().toArray();
+        res.send(result);
+      }
+    );
+
+    app.patch(
+      "/decorator-requests/:id",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const { status, email } = req.body;
+
+        const filter = { _id: new ObjectId(id) };
+        const updateDoc = { $set: { status: status } };
+        await decoratorRequestsCollection.updateOne(filter, updateDoc);
+
+        if (status === "approved") {
+          await usersCollection.updateOne(
+            { email: email },
+            { $set: { role: "decorator" } }
+          );
+        }
+
+        res.send({ success: true });
+      }
+    );
+    n;
+
     //!  SERVICE related API's
     app.get("/services", async (req, res) => {
       const {
