@@ -217,6 +217,39 @@ async function run() {
       res.send(result);
     });
 
+    // Update Service
+    app.patch("/services/:id", verifyFBToken, verifyAdmin, async (req, res) => {
+      const id = req.params.id;
+      const item = req.body;
+      delete item._id;
+
+      if (item.cost) {
+        item.cost = parseInt(item.cost);
+      }
+
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: { ...item },
+      };
+
+      const result = await servicesCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    });
+
+    // Delete Service
+    app.delete(
+      "/services/:id",
+      verifyFBToken,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const result = await servicesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+        res.send(result);
+      }
+    );
+
     //! PAYMENT API's
 
     const VALID_COUPONS = {
