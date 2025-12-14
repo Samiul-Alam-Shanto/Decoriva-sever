@@ -368,7 +368,7 @@ async function run() {
           finalAmount -= discountAmount;
         }
 
-        const clientUrl = process.env.CLIENT_URL || "http://localhost:5173";
+        const clientUrl = process.env.CLIENT_URL;
 
         const session = await stripeClient.checkout.sessions.create({
           payment_method_types: ["card"],
@@ -394,7 +394,7 @@ async function run() {
             userEmail,
             couponUsed: couponCode || "none",
           },
-          success_url: `${clientUrl}/payment/success?session_id={CHECKOUT_SESSION_ID}&bookingId=${bookingId}`,
+          success_url: `${clientUrl}/dashboard/payment/success?session_id={CHECKOUT_SESSION_ID}&bookingId=${bookingId}`,
           cancel_url: `${clientUrl}/services`,
         });
 
